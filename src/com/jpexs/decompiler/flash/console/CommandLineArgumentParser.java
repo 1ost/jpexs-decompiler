@@ -171,6 +171,7 @@ import com.jpexs.decompiler.flash.tags.base.TextTag;
 import com.jpexs.decompiler.flash.tags.base.UnsupportedSamplingRateException;
 import com.jpexs.decompiler.flash.timeline.Timeline;
 import com.jpexs.decompiler.flash.timeline.Timelined;
+import com.jpexs.decompiler.flash.treeitems.Openable;
 import com.jpexs.decompiler.flash.treeitems.OpenableList;
 import com.jpexs.decompiler.flash.types.CXFORMWITHALPHA;
 import com.jpexs.decompiler.flash.types.RECT;
@@ -437,6 +438,12 @@ public class CommandLineArgumentParser {
         if (filter == null || filter.equals("removeinstancemetadata")) {
             out.println(PREFIX + "-removeInstanceMetadata -instance myobj -key mykey -outfile result.swf myfile.swf");
             out.println(PREFIX + "-removeInstanceMetadata -instance myobj myfile.swf");
+            exampleFound = true;
+        }
+
+        if (filter == null || filter.equals("removeclass")) {
+            out.println(PREFIX + "-removeClass myfile.swf myfile_pruned.swf com.example.MyClass");
+            out.println(PREFIX + "-removeClass myfile.swf myfile_pruned.swf com.example.+,net.company.MyClass");
             exampleFound = true;
         }
 
@@ -741,6 +748,9 @@ public class CommandLineArgumentParser {
             System.exit(0);
         } else if (command.equals("remove")) {
             parseRemove(args, charset);
+            System.exit(0);
+        } else if (command.equals("removeclass")) {
+            parseRemoveClass(args, charset);
             System.exit(0);
         } else if (command.equals("removecharacter")) {
             parseRemoveCharacter(args, false, charset);
@@ -2090,8 +2100,12 @@ public class CommandLineArgumentParser {
     }
 
     private static List<String> parseSelectClass(Stack<String> args) {
+        return parseClassList(args, "selectclass");
+    }
+
+    private static List<String> parseClassList(Stack<String> args, String command) {
         if (args.size() < 1) {
-            badArguments("selectclass");
+            badArguments(command);
         }
         List<String> ret = new ArrayList<>();
         String classesStr = args.pop();
@@ -2103,7 +2117,6 @@ public class CommandLineArgumentParser {
         }
         ret.addAll(Arrays.asList(classes));
         return ret;
-
     }
 
     private static void parseExport(
@@ -3679,6 +3692,102 @@ public class CommandLineArgumentParser {
         } catch (IOException | InterruptedException e) {
             System.err.println("I/O error during reading");
             System.exit(2);
+        }
+    }
+
+    private static void parseRemoveClass(Stack<String> args, String charset) {
+        if (args.size() < 3) {
+            badArguments("removeclass");
+        }
+
+        File inFile = new File(args.pop());
+        File outFile = new File(args.pop());
+        List<String> classNames = new ArrayList<>();
+        classNames.addAll(parseClassList(args, "removeclass"));
+        while (!args.isEmpty() && !args.peek().startsWith("-")) {
+            classNames.addAll(parseClassList(args, "removeclass"));
+        }
+
+        try {
+            try (StdInAwareFileInputStream is = new StdInAwareFileInputStream(inFile)) {
+                SWF swf = new SWF(is, Configuration.parallelSpeedUp.get(), charset);
+                LinkedHashSet<ScriptPack> packsToRemove = new LinkedHashSet<>();
+                List<String> missing = new ArrayList<>();
+
+                for (String className : classNames) {
+                    List<ScriptPack> packs = swf.getScriptPacksByClassNames(Arrays.asList(className));
+                    if (packs.isEmpty()) {
+                        missing.add(className);
+                    } else {
+                        packsToRemove.addAll(packs);
+                    }
+                }
+
+                if (packsToRemove.isEmpty()) {
+                    if (missing.isEmpty()) {
+                        System.err.println("No AS3 classes matched.");
+                    } else {
+                        System.err.println("No AS3 classes matched: " + String.join(", ", missing));
+                    }
+                    System.exit(1);
+                }
+
+                if (!missing.isEmpty()) {
+                    System.err.println("Warning: no AS3 classes matched: " + String.join(", ", missing));
+                }
+
+                Set<ABC> abcsToPack = new LinkedHashSet<>();
+                for (ScriptPack pack : packsToRemove) {
+                    pack.delete(pack.abc, true);
+                    abcsToPack.add(pack.abc);
+                    Openable openable = pack.getOpenable();
+                    SWF packSwf = (openable instanceof SWF) ? (SWF) openable : ((ABC) openable).getSwf();
+                    for (ABCContainerTag ct : packSwf.getAbcList()) {
+                        if (ct.getABC() == pack.abc) {
+                            ((Tag) ct).setModified(true);
+                            break;
+                        }
+                    }
+                }
+
+                for (ABC abc : abcsToPack) {
+                    abc.pack();
+
+                    ABCContainerTag container = null;
+                    for (ABCContainerTag ct : abc.getSwf().getAbcList()) {
+                        if (ct.getABC() == abc) {
+                            container = ct;
+                            break;
+                        }
+                    }
+                    if (container == null) {
+                        continue;
+                    }
+                    if (abc.script_info.isEmpty()) {
+                        abc.getSwf().removeTag((Tag) container);
+                        abc.getSwf().setModified(true);
+                    } else {
+                        ((Tag) container).setModified(true);
+                    }
+                }
+
+                swf.clearAllCache();
+
+                try {
+                    try (OutputStream fos = new BufferedOutputStream(new FileOutputStream(outFile))) {
+                        swf.saveTo(fos);
+                    }
+                } catch (IOException e) {
+                    System.err.println("I/O error during writing");
+                    System.exit(2);
+                }
+            }
+        } catch (IOException | InterruptedException e) {
+            System.err.println("I/O error during reading");
+            System.exit(2);
+        } catch (Exception e) {
+            System.err.println("Error while removing classes: " + e.getMessage());
+            System.exit(1);
         }
     }
 

@@ -142,6 +142,15 @@ alias /?
     Remove a tag from the SWF.
     Remove tags based in index from main SWF timeline.
 
+-removeClass <infile> <outfile> <classnames>
+    Remove AS3 classes by name.
+    <classnames> format:
+        com.example.MyClass
+        com.example.+   (all classes in package "com.example")
+        com.++,net.company.MyClass  (all classes in package "com" and all 
+                                    subpackages, class net.company.MyClass)
+        DO NOT PUT space between comma (,) and next class.
+
 -removeCharacter <infile> <outfile> <characterId1> [<characterId2>]...
     Remove a character tag from the SWF.
 

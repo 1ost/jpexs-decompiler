@@ -1,0 +1,77 @@
+plugins {
+    id 'java'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(8)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+def appResourceIncludes = [
+        '**/?*.properties',
+        '**/?*.colorschemes',
+        '**/?*.bin',
+        '**/?*.xml',
+        '**/?*.txt',
+        '**/?*.gif',
+        '**/?*.png',
+        '**/?*.jpeg',
+        '**/?*.jpg',
+        '**/?*.html',
+        '**/?*.dtd',
+        '**/?*.tld',
+        '**/?*.mid',
+        '**/?*.wav',
+        '**/?*.js',
+        '**/?*.swf',
+        '**/?*.css'
+]
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+        }
+        resources {
+            srcDirs = ['src']
+            include appResourceIncludes
+            exclude '**/*.java'
+        }
+    }
+}
+
+dependencies {
+    implementation project(':ffdec-lib')
+    implementation fileTree(dir: 'lib', include: ['**/*.jar'])
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xlint:unchecked', '-Xlint:deprecation']
+}
+
+jar {
+    archiveBaseName.set('ffdec')
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    zip64 = true
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    manifest {
+        attributes(
+                'Main-Class': 'com.jpexs.decompiler.flash.gui.Main',
+                'Enable-Native-Access': 'ALL-UNNAMED'
+        )
+    }
+}
+
+tasks.register('buildJars') {
+    description = 'Builds ffdec.jar and ffdec-cli.jar'
+    group = 'build'
+    dependsOn tasks.named('jar'), project(':ffdec-cli').tasks.named('jar')
+}
