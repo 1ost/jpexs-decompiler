@@ -65,6 +65,7 @@ import com.jpexs.decompiler.flash.exporters.FrameExporter;
 import com.jpexs.decompiler.flash.exporters.ImageExporter;
 import com.jpexs.decompiler.flash.exporters.MorphShapeExporter;
 import com.jpexs.decompiler.flash.exporters.MovieExporter;
+import com.jpexs.decompiler.flash.exporters.PreviewExporter;
 import com.jpexs.decompiler.flash.exporters.ShapeExporter;
 import com.jpexs.decompiler.flash.exporters.SoundExporter;
 import com.jpexs.decompiler.flash.exporters.SymbolClassExporter;
@@ -169,6 +170,7 @@ import com.jpexs.decompiler.flash.tags.base.SoundTag;
 import com.jpexs.decompiler.flash.tags.base.TextImportErrorHandler;
 import com.jpexs.decompiler.flash.tags.base.TextTag;
 import com.jpexs.decompiler.flash.tags.base.UnsupportedSamplingRateException;
+import com.jpexs.decompiler.flash.tags.enums.ImageFormat;
 import com.jpexs.decompiler.flash.timeline.Timeline;
 import com.jpexs.decompiler.flash.timeline.Timelined;
 import com.jpexs.decompiler.flash.treeitems.Openable;
@@ -513,6 +515,8 @@ public class CommandLineArgumentParser {
         Map<String, String> format = new HashMap<>();
         Map<String, String> changedImports = new LinkedHashMap<>();
         double zoom = 1;
+        Double morphDuration = PreviewExporter.MORPH_SHAPE_DEFAULT_DURATION;
+        int morphNumFrames = 10;
         String charset = Charset.defaultCharset().name();
         boolean cliMode = false;
         boolean air = false;
@@ -560,6 +564,12 @@ public class CommandLineArgumentParser {
                     break;
                 case "-zoom":
                     zoom = parseZoom(args);
+                    break;
+                case "-morphduration":
+                    morphDuration = parseMorphDuration(args);
+                    break;
+                case "-morphnumframes":
+                    morphNumFrames = parseMorphNumFrames(args);
                     break;
                 case "-format":
                     format = parseFormat(args);
@@ -684,7 +694,7 @@ public class CommandLineArgumentParser {
         } else if (command.equals("proxy")) {
             parseProxy(args);
         } else if (command.equals("export")) {
-            parseExport(selectionClasses, selection, selectionIds, args, handler, traceLevel, format, zoom, charset, exportEmbed, transparentBackground, urlResolver, subLength);
+            parseExport(selectionClasses, selection, selectionIds, args, handler, traceLevel, format, zoom, charset, exportEmbed, transparentBackground, urlResolver, subLength, morphDuration, morphNumFrames);
             System.exit(0);
         } else if (command.equals("compress")) {
             parseCompress(args);
@@ -1747,7 +1757,7 @@ public class CommandLineArgumentParser {
                 subLen = 1;
             }
             return subLen;
-        } catch (NumberFormatException nre) {
+        } catch (NumberFormatException nfe) {
             System.err.println("Invalid sub length");
             badArguments("sublength");
         }
@@ -1766,6 +1776,42 @@ public class CommandLineArgumentParser {
             badArguments("zoom");
         }
         return 1;
+    }
+    
+    private static double parseMorphDuration(Stack<String> args) {
+        if (args.isEmpty()) {
+            System.err.println("duration parameter expected");
+            badArguments("morphduration");
+        }
+        try {
+            double val = Double.parseDouble(args.pop());
+            if (val <= 0) {
+                throw new NumberFormatException();
+            }                    
+            return val;
+        } catch (NumberFormatException nfe) {
+            System.err.println("invalid duration");
+            badArguments("morphduration");
+        }
+        return 2;
+    }
+    
+    private static int parseMorphNumFrames(Stack<String> args) {
+        if (args.isEmpty()) {
+            System.err.println("number of frames parameter expected");
+            badArguments("morphnumframes");
+        }
+        try {
+            int val = Integer.parseInt(args.pop());
+            if (val < 2) {
+                throw new NumberFormatException();
+            }
+            return val;
+        } catch (NumberFormatException nfe) {
+            System.err.println("invalid number of frames");
+            badArguments("morphnumframes");
+        }
+        return 50;
     }
 
     private static AbortRetryIgnoreHandler parseOnError(Stack<String> args) {
@@ -2132,7 +2178,10 @@ public class CommandLineArgumentParser {
             boolean exportEmbed, 
             boolean transparentBackground, 
             UrlResolver urlResolver,
-            int subFrameLength) {
+            int subFrameLength,
+            double morphDuration,
+            int morphNumFrames
+    ) {
         if (args.size() < 3) {
             badArguments("export");
         }
@@ -2311,7 +2360,7 @@ public class CommandLineArgumentParser {
 
                 if (exportAll || exportFormats.contains("morphshape")) {
                     System.out.println("Exporting morphshapes...");
-                    new MorphShapeExporter().exportMorphShapes(handler, outDir + (multipleExportTypes ? File.separator + MorphShapeExportSettings.EXPORT_FOLDER_NAME : ""), new ReadOnlyTagList(extags), new MorphShapeExportSettings(enumFromStr(formats.get("morphshape"), MorphShapeExportMode.class), zoom, aaScale), evl);
+                    new MorphShapeExporter().exportMorphShapes(handler, outDir + (multipleExportTypes ? File.separator + MorphShapeExportSettings.EXPORT_FOLDER_NAME : ""), new ReadOnlyTagList(extags), new MorphShapeExportSettings(enumFromStr(formats.get("morphshape"), MorphShapeExportMode.class), zoom, aaScale, morphDuration, morphNumFrames), evl);
                 }
 
                 if (exportAll || exportFormats.contains("movie")) {
@@ -2953,7 +3002,14 @@ public class CommandLineArgumentParser {
                 badArguments("format");
             }
             String[] parts = fmt.split(":");
-            ret.put(parts[0].toLowerCase(Locale.ENGLISH), parts[1].toLowerCase(Locale.ENGLISH));
+            String key = parts[0].toLowerCase(Locale.ENGLISH);
+            String val = parts[1].toLowerCase(Locale.ENGLISH);
+            
+            if (val.contains("webp") && !ImageFormat.WEBP.available()) {
+                System.err.println("WEBP format is not available on this platform");
+                badArguments("format");
+            }
+            ret.put(key, val);
         }
         return ret;
     }

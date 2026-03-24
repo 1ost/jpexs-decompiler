@@ -304,7 +304,7 @@ public class ActionGraph extends Graph {
     
     @Override
     protected void finalProcess(GraphTargetItem parent, List<GraphTargetItem> list, int level, FinalProcessLocalData localData, String path) throws InterruptedException {
-                               
+                           
         if (level == 0) {
             List<GraphTargetItem> removed = new ArrayList<>();
             for (int i = list.size() - 1; i >= 0; i--) {
@@ -1023,10 +1023,9 @@ public class ActionGraph extends Graph {
         checkSecondPassSwitches(processedIfs, list, spd.switchParts, spd.switchOnFalseParts, spd.switchCaseExpressions);
 
         
-        if (spd.switchParts.isEmpty() && !localData.gotosUsed.getVal() && localData.allSwitchParts.isEmpty()) {
+        if (spd.switchParts.isEmpty() && !localData.gotosUsed.getVal()) {
             return null; //no need to second pass
         }
-        spd.allSwitchParts.addAll(localData.allSwitchParts);
         return spd;
     }
     

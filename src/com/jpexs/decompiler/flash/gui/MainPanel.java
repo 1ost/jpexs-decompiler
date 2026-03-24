@@ -451,6 +451,8 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
     private boolean loadingScrollPosEnabled = true;
     
     private static final DataFlavor TREE_FILE_FLAVOR = new DataFlavor(TreeFileFlavor.class, "TreeFile");
+    
+    private boolean editingStatusSet = false;
 
     public synchronized void setLoadingScrollPosEnabled(boolean loadingScrollPosEnabled) {
         this.loadingScrollPosEnabled = loadingScrollPosEnabled;
@@ -972,11 +974,15 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
     }
 
     public void setEditingStatus() {
+        editingStatusSet = true;
         statusPanel.setStatus(translate(Configuration.autoSaveTagModifications.get() ? "status.editing.autosave" : "status.editing"));
     }
 
     public void clearEditingStatus() {
-        statusPanel.setStatus("");
+        if (editingStatusSet) {
+            statusPanel.setStatus("");
+            editingStatusSet = false;
+        }
     }
 
     public void setWorkStatus(String s, CancellableWorker worker) {
@@ -1116,7 +1122,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
         debugStackPanel = new DebugStackPanel();
         Main.getDebugHandler().addBreakListener(new DebuggerHandler.BreakListener() {
             @Override
-            public void breakAt(String scriptName, int line, int classIndex, int traitIndex, int methodIndex) {
+            public void breakAt(DebuggerSession session, String scriptName, int line, int classIndex, int traitIndex, int methodIndex) {
                 View.execInEventDispatchLater(new Runnable() {
                     @Override
                     public void run() {
@@ -1126,23 +1132,25 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
             }
 
             @Override
-            public void doContinue() {
+            public void doContinue(DebuggerSession session) {
                 View.execInEventDispatchLater(new Runnable() {
                     @Override
                     public void run() {
-                        showDetail(DETAILCARDEMPTYPANEL);
+                        if (Main.getDebugHandler().getNumberOfPausedSessions() == 0) {
+                            showDetail(DETAILCARDEMPTYPANEL);
+                        }
                     }
                 });
             }
         });
         Main.getDebugHandler().addConnectionListener(new DebuggerHandler.ConnectionListener() {
             @Override
-            public void connected() {
+            public void connected(DebuggerSession session) {
 
             }
 
             @Override
-            public void disconnected() {
+            public void disconnected(DebuggerSession session) {
                 View.execInEventDispatchLater(new Runnable() {
                     @Override
                     public void run() {
@@ -1628,6 +1636,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
     private void updateUi(final Openable openable) {
         View.checkAccess();
+        //Main.updateSession();
         SWF swf = null;
         if (openable instanceof SWF) {
             swf = (SWF) openable;
@@ -1646,7 +1655,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
                 if (!abcFound) {
                     getABCPanel().setAbc(abcList.get(0).getABC());
                 }
-            }
+            }            
         }
         mainMenu.updateComponents(openable);
 
@@ -2289,7 +2298,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
             if (export.isOptionEnabled(MorphShapeExportMode.class)) {
                 ret.addAll(new MorphShapeExporter().exportMorphShapes(handler, selFile2 + File.separator + MorphShapeExportSettings.EXPORT_FOLDER_NAME, new ReadOnlyTagList(morphshapes),
-                        new MorphShapeExportSettings(export.getValue(MorphShapeExportMode.class), export.getZoom(), aaScale), evl));
+                        new MorphShapeExportSettings(export.getValue(MorphShapeExportMode.class), export.getZoom(), aaScale, export.getMorphDuration(), export.getMorphNumberOfFrames()), evl));
             }
 
             if (export.isOptionEnabled(TextExportMode.class)) {
@@ -2409,7 +2418,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
         if (export.isOptionEnabled(MorphShapeExportMode.class)) {
             new MorphShapeExporter().exportMorphShapes(handler, Path.combine(selFile, MorphShapeExportSettings.EXPORT_FOLDER_NAME), swf.getTags(),
-                    new MorphShapeExportSettings(export.getValue(MorphShapeExportMode.class), export.getZoom(), aaScale), evl);
+                    new MorphShapeExportSettings(export.getValue(MorphShapeExportMode.class), export.getZoom(), aaScale, export.getMorphDuration(), export.getMorphNumberOfFrames()), evl);
         }
 
         if (export.isOptionEnabled(TextExportMode.class)) {
@@ -2508,7 +2517,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
         if (export.isOptionEnabled(MorphShapeExportMode.class)) {
             for (MorphShapeExportMode exportMode : MorphShapeExportMode.values()) {
                 new MorphShapeExporter().exportMorphShapes(handler, Path.combine(selFile, MorphShapeExportSettings.EXPORT_FOLDER_NAME, exportMode.name()), swf.getTags(),
-                        new MorphShapeExportSettings(exportMode, export.getZoom(), aaScale), evl);
+                        new MorphShapeExportSettings(exportMode, export.getZoom(), aaScale, export.getMorphDuration(), export.getMorphNumberOfFrames()), evl);
             }
         }
 
@@ -2709,7 +2718,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
         }
     }
 
-    public void gotoScriptMethod(SWF swf, String scriptName, int methodIndex) {
+    public boolean gotoScriptMethod(SWF swf, String scriptName, int methodIndex) {
         abcPanel.decompiledTextArea.addScriptListener(new Runnable() {
             @Override
             public void run() {
@@ -2719,10 +2728,10 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
                 }
             }
         });
-        gotoScriptName(swf, scriptName);
+        return gotoScriptName(swf, scriptName);
     }
 
-    public void gotoScriptTrait(SWF swf, String scriptName, int classIndex, int traitIndex) {
+    public boolean gotoScriptTrait(SWF swf, String scriptName, int classIndex, int traitIndex) {
         abcPanel.decompiledTextArea.addScriptListener(new Runnable() {
             @Override
             public void run() {
@@ -2737,7 +2746,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
                 }
             }
         });
-        gotoScriptName(swf, scriptName);
+        return gotoScriptName(swf, scriptName);
     }
 
     public void findOrLoadOpenableListByFilePath(String filePath, OpenableListLoaded executeAfterOpen, boolean loadSession) {
@@ -2759,7 +2768,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
         }, loadSession);
     }
 
-    public void gotoScriptLine(SWF swf, String scriptName, int line, int classIndex, int traitIndex, int methodIndex, boolean pcode) {
+    public boolean gotoScriptLine(SWF swf, String scriptName, int line, int classIndex, int traitIndex, int methodIndex, boolean pcode) {
         View.checkAccess();
 
         if (abcPanel != null && swf.isAS3()) {
@@ -2813,7 +2822,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
                 }
             });
         }
-        gotoScriptName(swf, scriptName);
+        return gotoScriptName(swf, scriptName);
     }
 
     public void refreshBreakPoints() {
@@ -2841,11 +2850,11 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
      });
 
      }*/
-    public void gotoScriptName(SWF mainSwf, String scriptNameWithSwfHash) {
+    public boolean gotoScriptName(SWF mainSwf, String scriptNameWithSwfHash) {
         View.checkAccess();
 
         if (mainSwf == null) {
-            return;
+            return false;
         }
         if (mainSwf.isAS3()) {
             String rawScriptName = scriptNameWithSwfHash;
@@ -2858,7 +2867,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
             //if (!abcList.isEmpty()) {
             ABCPanel abcPanel = getABCPanel();
 
-            abcPanel.hilightScript(mainSwf, rawScriptName);
+            return abcPanel.hilightScript(mainSwf, rawScriptName);
             //}
         } else {
             String rawScriptName = scriptNameWithSwfHash;
@@ -2869,19 +2878,21 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
             if (asms.containsKey(rawScriptName)) {
                 oldItem = null;
                 getCurrentTree().setSelectionPath(null);
-                setTagTreeSelectedNode(getCurrentTree(), asms.get(rawScriptName));
+                setTagTreeSelectedNode(getCurrentTree(), asms.get(rawScriptName));                
+                return true;
             }
             /*if (actionPanel != null && asms.containsKey(rawScriptName)) {
                 actionPanel.setSource(asms.get(rawScriptName), true);                
             }*/
         }
+        return false;
     }
 
-    public void gotoDocumentClass(SWF swf) {
+    public boolean gotoDocumentClass(SWF swf) {
         View.checkAccess();
 
         if (swf == null) {
-            return;
+            return false;
         }
 
         String documentClass = swf.getDocumentClass();
@@ -2894,11 +2905,12 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
                     if (c.getABC().findClassByName(documentClass) > -1) {
                         abcPanel.setAbc(c.getABC());
                         abcPanel.hilightScript(swf, documentClassPrintable);
-                        break;
+                        return true;
                     }
                 }
             }
         }
+        return false;
     }
 
     public void disableDecompilationChanged() {
@@ -3453,7 +3465,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
                 @Override
                 protected void onStart() {
-                    Main.startWork(translate("work.renaming.identifiers") + "...", this);
+                    Main.startWork(translate("work.renaming.identifiers") + "...", this, true);
                 }
 
                 @Override
@@ -3502,7 +3514,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
                     @Override
                     protected void onStart() {
-                        Main.startWork(translate("work.renaming") + "...", this);
+                        Main.startWork(translate("work.renaming") + "...", this, true);
                     }
 
                     @Override
@@ -3530,7 +3542,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
                     @Override
                     protected void onStart() {
-                        Main.startWork(translate("work.renaming") + "...", this);
+                        Main.startWork(translate("work.renaming") + "...", this, true);
                     }
 
                     @Override
@@ -3624,7 +3636,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
                     @Override
                     public void status(String status) {
-                        Main.startWork(translate("work.exporting.flashDevelop") + "..." + status, w);
+                        Main.startWork(translate("work.exporting.flashDevelop") + "..." + status, w, false);
                     }
                 };
                 EventListener evl = swf.getExportEventListener();
@@ -3641,7 +3653,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
             @Override
             protected void onStart() {
-                Main.startWork(translate("work.exporting.flashDevelop") + "...", this);
+                Main.startWork(translate("work.exporting.flashDevelop") + "...", this, true);
             }
 
             @Override
@@ -3697,7 +3709,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
                     @Override
                     public void status(String status) {
-                        Main.startWork(translate("work.exporting.idea") + "..." + status, w);
+                        Main.startWork(translate("work.exporting.idea") + "..." + status, w, false);
                     }
                 };
                 EventListener evl = swf.getExportEventListener();
@@ -3714,7 +3726,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
             @Override
             protected void onStart() {
-                Main.startWork(translate("work.exporting.idea") + "...", this);
+                Main.startWork(translate("work.exporting.idea") + "...", this, true);
             }
 
             @Override
@@ -3770,7 +3782,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
                     @Override
                     public void status(String status) {
-                        Main.startWork(translate("work.exporting.vsCode") + "..." + status, w);
+                        Main.startWork(translate("work.exporting.vsCode") + "..." + status, w, false);
                     }
                 };
                 EventListener evl = swf.getExportEventListener();
@@ -3787,7 +3799,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
             @Override
             protected void onStart() {
-                Main.startWork(translate("work.exporting.vsCode") + "...", this);
+                Main.startWork(translate("work.exporting.vsCode") + "...", this, true);
             }
 
             @Override
@@ -3930,7 +3942,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
                         @Override
                         public void status(String status) {
-                            Main.startWork(translate("work.exporting.fla") + "..." + status, w);
+                            Main.startWork(translate("work.exporting.fla") + "..." + status, w, false);
                         }
                     };
 
@@ -3951,7 +3963,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
                 @Override
                 protected void onStart() {
-                    Main.startWork(translate("work.exporting.fla") + "...", this);
+                    Main.startWork(translate("work.exporting.fla") + "...", this, true);
                 }
 
                 @Override
@@ -4013,7 +4025,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
                 @Override
                 protected void onStart() {
-                    Main.startWork(translate("work.importing") + "...", this);
+                    Main.startWork(translate("work.importing") + "...", this, true);
                 }
 
                 @Override
@@ -4073,7 +4085,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
                 @Override
                 protected void onStart() {
-                    Main.startWork(translate("work.importing") + "...", this);
+                    Main.startWork(translate("work.importing") + "...", this, true);
                 }
 
                 @Override
@@ -4132,7 +4144,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
                 @Override
                 protected void onStart() {
-                    Main.startWork(translate("work.importing") + "...", this);
+                    Main.startWork(translate("work.importing") + "...", this, true);
                 }
 
                 @Override
@@ -4192,7 +4204,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
                 @Override
                 protected void onStart() {
-                    Main.startWork(translate("work.importing") + "...", this);
+                    Main.startWork(translate("work.importing") + "...", this, true);
                 }
 
                 @Override
@@ -4250,7 +4262,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
                 @Override
                 protected void onStart() {
-                    Main.startWork(translate("work.importing") + "...", this);
+                    Main.startWork(translate("work.importing") + "...", this, true);
                 }
 
                 @Override
@@ -4439,7 +4451,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
                 @Override
                 protected void onStart() {
                     Main.importWorker = this;
-                    Main.startWork(translate("work.importing_as") + "...", this);
+                    Main.startWork(translate("work.importing_as") + "...", this, true);
                 }
 
                 @Override
@@ -4532,7 +4544,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
                     @Override
                     protected void onStart() {
-                        Main.startWork(translate("work.exporting") + "...", this);
+                        Main.startWork(translate("work.exporting") + "...", this, true);
                     }
 
                     @Override
@@ -4574,7 +4586,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
             SWF swf = (SWF) item;
             final String selFile = selectExportDir("exportjava");
             if (selFile != null) {
-                Main.startWork(translate("work.exporting") + "...", null);
+                Main.startWork(translate("work.exporting") + "...", null, true);
 
                 try {
                     new SwfJavaExporter().exportJavaCode(swf, selFile);
@@ -4657,7 +4669,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
         AbortRetryIgnoreHandler handler = new GuiAbortRetryIgnoreHandler();
         for (SWF openable : usedOpenables) {
             if (selFile != null) {
-                Main.startWork(translate("work.exporting") + "...", null);
+                Main.startWork(translate("work.exporting") + "...", null, true);
 
                 String selFile2;
                 if (usedOpenables.size() > 1) {
@@ -4772,7 +4784,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
                     @Override
                     protected void onStart() {
-                        Main.startWork(translate("work.renaming.identifiers") + "...", this);
+                        Main.startWork(translate("work.renaming.identifiers") + "...", this, true);
                     }
 
                     @Override
@@ -4883,7 +4895,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
                 @Override
                 protected void onStart() {
                     Main.deobfuscatePCodeWorker = this;
-                    Main.startWork(translate("work.deobfuscating") + "...", this);
+                    Main.startWork(translate("work.deobfuscating") + "...", this, true);
                 }
 
                 @Override
@@ -4937,16 +4949,16 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
         }
 
         List<Tag> tagsToRemove = new ArrayList<>();
-        loopt: for (Tag tag : swf.getTags()) {
+        loopTags: for (Tag tag : swf.getTags()) {
             if (tag instanceof CharacterTag) {
                 CharacterTag characterTag = (CharacterTag) tag;
                 for (String cls : characterTag.getClassNames()) {
                     if (neededClasses.contains(cls)) {
-                        continue loopt;
+                        continue loopTags;
                     }
                 }
                 if (needed.contains(characterTag.getCharacterId())) {
-                    continue loopt;
+                    continue loopTags;
                 }
                 tagsToRemove.add(tag);
             }
@@ -5629,7 +5641,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
                 @Override
                 protected void onStart() {
-                    Main.startWork(translate("work.exporting") + "...", this);
+                    Main.startWork(translate("work.exporting") + "...", this, true);
                 }
 
                 @Override
@@ -5766,12 +5778,14 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
     private void valueChanged(Object source, TreePath selectedPath) {
         TreeItem treeItem = selectedPath == null ? null : (TreeItem) selectedPath.getLastPathComponent();
-
-        if (treeItem == null) {
+        
+        if (treeItem == null) {            
             updateUi(null);
             reload(false);
             return;
         }
+        
+        //Main.updateSession();
 
         if (!(treeItem instanceof OpenableList)) {
             Openable openable = treeItem.getOpenable();
@@ -6110,7 +6124,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
             @Override
             protected void onStart() {
-                Main.startWork(AppStrings.translate("work.reading.swf") + "...", this);
+                Main.startWork(AppStrings.translate("work.reading.swf") + "...", this, true);
             }
 
             @Override
@@ -6360,7 +6374,7 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
         if (openable instanceof SWF) {
             SwfSpecificCustomConfiguration swfCustomConf = Configuration.getOrCreateSwfSpecificCustomConfiguration(openable.getShortPathTitle());
             SWF swf = (SWF) openable;
-            Map<String, Set<Integer>> breakpoints = Main.getDebugHandler().getAllBreakPoints(swf, false);
+            Map<String, Set<Integer>> breakpoints = Main.getDebugHandler().getAllSessionsBreakPoints(swf);
             List<String> breakpointList = new ArrayList<>();
             for (String scriptName : breakpoints.keySet()) {
                 for (int line : breakpoints.get(scriptName)) {
@@ -7052,5 +7066,9 @@ public final class MainPanel extends JPanel implements TreeSelectionListener, Se
 
     public EasyPanel getEasyPanel() {
         return easyPanel;
+    }
+    
+    public void showDebugStackFrame() {
+        showDetail(DETAILCARDDEBUGSTACKFRAME);
     }
 }

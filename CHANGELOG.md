@@ -1,6 +1,107 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
+## [25.1.3] - 2026-03-04
+### Added
+- Debugger - Button to disconnect current session (stay listening)
+- [#2644] Debugger - Button to sort variables alphabetically
+- AS3 Direct editation - Error when accessing inaccessible namespace
+- AS3 ambiguous namespace detection (back again)
+- [#2648] Dockerfile
+- SVG export - Gradient bevel filter, Gradient glow filter
+
+### Fixed
+- [#2643] APNG export - images containing multiple IDAT chunks
+- AS3 direct editation - proper use convert/coerce instruction
+- AS3 direct editation - use coerce_f for float values
+- [#2645] Windows MSI installer - Cannot change install directory
+- Long delay before switching critical status bar titles
+  (Causing many actions to look slow - for example Debug listening)
+- AS3 goto definition missing some namespaces
+- [#2514] AS3 direct editation - problems with namespaces
+- [#2649] SVG export - blur scaling (on supported browsers)
+- [#2651] Loop breaks detection
+- [#2653] Check for WEBP availability in CLI
+
+### Changed
+- Icon of Debug listen action from ear to phone receiver
+- [#2649] SVG export - using gaussian blur instead of box blur with convolution matrix
+  (Can be turned off in the settings)
+
+## [25.1.2] - 2026-02-23
+### Added
+- Debugger - Debugged SWF file name in the session title
+- Debugger - Remove watch
+- Debugger - List of watches
+- Debugger - Show flag of watch type (read/write)
+
+### Fixed
+- [#2639] Export to FLA - missing sound streams
+- Debugger - Threading issues with multiple SWFs
+- Debugger - Reading variables on 64bit flash players (like in browsers)
+- DoInitAction should be ignored when exporting as SWF
+
+### Changed
+- [#2642] Sprite SWF export - do not export as SWF timeline, use DefineSprite tag
+  and PlaceObject of it
+
+### Removed
+- (Temporary) AS3 ambiguous namespace detection, it is slow - needs optimizations
+
+## [25.1.1] - 2026-02-19
+### Fixed
+- [#2636] ActionScript - Incorrect always-break detection causing insertion of while(true)
+- [#2636] ActionScript 3 - Incorrect switch detection
+- AS3 property resolving for KIND_NAMESPACE (like builtin for Strings, etc.)
+- [#2636] ActionScript - switches vs loop breaks
+- [#2636] ActionScript 3 - type coercion / convert, local registers type propagation
+- Using public/private/protected/internal keywords on ambiguous namespace references
+  and compiling such keywords with `::` suffix.
+
+## [25.1.0] - 2026-02-17
+### Added
+- [#1209], [#1850], [#2619] Debugging SWF in the web browser
+  (Debug listening capability - only for SWFs previously prepared by FFDec)
+- TTF export - setting italic / bold flags in the font
+- ffdec-cli.exe is signed
+- [#2636] AS3 QName properties with nonvalid identifiers handled as strings in brackets
+  (Can be turned on in advanced settings)
+
+### Fixed
+- Metadata formatting
+- [#2632] TTF export - non-zero italic angle
+- Improper standalone player termination, not cleaning temp files
+- [#2636] ActionScript - Incorrect always-break detection causing insertion of while(true)
+- ActionScript - newline after do..while
+- StackOverflow on cyclic characters
+- ConcurrentModification in abc indexing
+
+## [25.0.0] - 2026-02-10
+### Added
+- [#2610] Export morphshapes - export individual frames, setting of morph
+  duration and/or number of morph frames
+- Export morphshapes to GIF and AVI
+- Animated WEBP export for frames, sprites and morphshapes
+- Export dialog - Icons per export type and arrow symbol
+- Updated German translation (AI used)
+- Slovak translation (AI used)
+- APNG (animated PNG) export for frames, sprites and morphshapes
+- Context menu association icon
+- Windows installer (MSI), ffdec.exe, ffdec.jar and ffdec_lib.jar are signed
+- ffdec.exe contains version information (+ on SplashScreen)
+
+### Fixed
+- [#2603] Export Sprite as SWF - sprite frames as timeline frames, without sprite itself
+- HTML5 Canvas morphshape export
+- Slovenian translation
+- [#2626] AS1/2 direct editation - function calls inside `with` statement
+- [#2618] AS1/2 increment/decrement/compound using PushDuplicate
+- [#2611], [#2627] StackOverFlow on opening SWF containing cyclic sprites
+
+### Changed
+- [#2610] Export as SWF - take SWF bounds from the exported item bounds
+- MSI installer instead of setup.exe on Windows
+
 ## [24.1.2] - 2026-01-31
 ### Added
 - [#2581] Save as SWC through context menu of SWF files (previously only in CLI)
@@ -20,7 +121,7 @@ All notable changes to this project will be documented in this file.
 - [#2575] dumpSWF CLI command displayed import assets GUI dialog
 - [#2573] AS3 - Incorrect uint/int/Number coercion
 - AS3 local registers type propagation
-- [#2566], [#2594] Export bounds of sprites and buttons not containg filter offsets
+- [#2566], [#2594] Export bounds of sprites and buttons not containing filter offsets
 - [#2582] Font normalizer setting small texts when no assigned glyph found
 - PDF export - not rendering video stream frames
 - [#2585] AS1/2 direct editation - continue and break in for..in loop
@@ -3906,6 +4007,11 @@ Major version of SWF to XML export changed to 2.
 ### Added
 - Initial public release
 
+[25.1.3]: https://github.com/jindrapetrik/jpexs-decompiler/compare/version25.1.2...version25.1.3
+[25.1.2]: https://github.com/jindrapetrik/jpexs-decompiler/compare/version25.1.1...version25.1.2
+[25.1.1]: https://github.com/jindrapetrik/jpexs-decompiler/compare/version25.1.0...version25.1.1
+[25.1.0]: https://github.com/jindrapetrik/jpexs-decompiler/compare/version25.0.0...version25.1.0
+[25.0.0]: https://github.com/jindrapetrik/jpexs-decompiler/compare/version24.1.2...version25.0.0
 [24.1.2]: https://github.com/jindrapetrik/jpexs-decompiler/compare/version24.1.1...version24.1.2
 [24.1.1]: https://github.com/jindrapetrik/jpexs-decompiler/compare/version24.1.0...version24.1.1
 [24.1.0]: https://github.com/jindrapetrik/jpexs-decompiler/compare/version24.0.1...version24.1.0
@@ -4080,6 +4186,27 @@ Major version of SWF to XML export changed to 2.
 [alpha 9]: https://github.com/jindrapetrik/jpexs-decompiler/compare/alpha8...alpha9
 [alpha 8]: https://github.com/jindrapetrik/jpexs-decompiler/compare/alpha7...alpha8
 [alpha 7]: https://github.com/jindrapetrik/jpexs-decompiler/releases/tag/alpha7
+[#2644]: https://www.free-decompiler.com/flash/issues/2644
+[#2648]: https://www.free-decompiler.com/flash/issues/2648
+[#2643]: https://www.free-decompiler.com/flash/issues/2643
+[#2645]: https://www.free-decompiler.com/flash/issues/2645
+[#2514]: https://www.free-decompiler.com/flash/issues/2514
+[#2649]: https://www.free-decompiler.com/flash/issues/2649
+[#2651]: https://www.free-decompiler.com/flash/issues/2651
+[#2653]: https://www.free-decompiler.com/flash/issues/2653
+[#2639]: https://www.free-decompiler.com/flash/issues/2639
+[#2642]: https://www.free-decompiler.com/flash/issues/2642
+[#2636]: https://www.free-decompiler.com/flash/issues/2636
+[#1209]: https://www.free-decompiler.com/flash/issues/1209
+[#1850]: https://www.free-decompiler.com/flash/issues/1850
+[#2619]: https://www.free-decompiler.com/flash/issues/2619
+[#2632]: https://www.free-decompiler.com/flash/issues/2632
+[#2610]: https://www.free-decompiler.com/flash/issues/2610
+[#2603]: https://www.free-decompiler.com/flash/issues/2603
+[#2626]: https://www.free-decompiler.com/flash/issues/2626
+[#2618]: https://www.free-decompiler.com/flash/issues/2618
+[#2611]: https://www.free-decompiler.com/flash/issues/2611
+[#2627]: https://www.free-decompiler.com/flash/issues/2627
 [#2581]: https://www.free-decompiler.com/flash/issues/2581
 [#2592]: https://www.free-decompiler.com/flash/issues/2592
 [#2154]: https://www.free-decompiler.com/flash/issues/2154

@@ -581,7 +581,7 @@ public class Graph {
                 if (q == p) {
                     continue;
                 }
-                if (!q.leadsTo(localData, this, code, p, loops, throwStates)) {
+                if (!q.leadsTo(localData, this, code, p, loops, throwStates, false)) {
                     common = false;
                     break;
                 }
@@ -666,10 +666,10 @@ public class Graph {
                 int levelCompare = o2.level - o1.level;
                 if (levelCompare == 0) {
                     try {
-                        if (o1.part.leadsTo(localData, Graph.this, code, o2.part, loops, throwStates)) {
+                        if (o1.part.leadsTo(localData, Graph.this, code, o2.part, loops, throwStates, false)) {
                             return -1;
                         }
-                        if (o2.part.leadsTo(localData, Graph.this, code, o1.part, loops, throwStates)) {
+                        if (o2.part.leadsTo(localData, Graph.this, code, o1.part, loops, throwStates, false)) {
                             return 1;
                         }
                         return 0;
@@ -732,7 +732,7 @@ public class Graph {
                         if (visited.contains(n)) {
                             continue;
                         }
-                        if (!n.leadsTo(localData, this, code, r, loops, throwStates)) {
+                        if (!n.leadsTo(localData, this, code, r, loops, throwStates, false)) {
                             common = false;
                             break loopprocess;
                         }
@@ -1305,6 +1305,41 @@ public class Graph {
                                 LoopItem innerLoop = (LoopItem) lastCommand;
                                 Block blk = (Block) lastCommand;
                                 changeContinueToBreak(blk, li.loop.id, innerLoop.loop.id);
+                                
+                                if (innerLoop instanceof UniversalLoopItem) {
+                                    UniversalLoopItem loopItem = (UniversalLoopItem) innerLoop;
+                                    if (!loopItem.commands.isEmpty() && loopItem.commands.get(loopItem.commands.size() - 1) instanceof IfItem) {
+                                        IfItem ifi = (IfItem) loopItem.commands.get(loopItem.commands.size() - 1);
+                                        boolean inverted = false;
+                                        boolean found = false;
+                                        if (ifi.onFalse.isEmpty() && (ifi.onTrue.size() == 1) && (ifi.onTrue.get(0) instanceof BreakItem)) {
+                                            BreakItem bi = (BreakItem) ifi.onTrue.get(0);
+                                            if (bi.loopId == loopItem.loop.id) {
+                                                found = true;
+                                                inverted = true;
+                                            }
+                                        } else if (ifi.onTrue.isEmpty() && (ifi.onFalse.size() == 1) && (ifi.onFalse.get(0) instanceof BreakItem)) {
+                                            BreakItem bi = (BreakItem) ifi.onFalse.get(0);
+                                            if (bi.loopId == loopItem.loop.id) {
+                                                found = true;
+                                            }
+                                        }
+
+                                        if (found) {         
+                                            loopItem.commands.remove(loopItem.commands.size() - 1);
+                                            GraphTargetItem expressionSingle = ifi.expression;
+                                            if (inverted) {
+                                                expressionSingle = expressionSingle.invert(null);
+                                            }
+                                            List<GraphTargetItem> expression = new ArrayList<>();
+                                            expression.add(expressionSingle);
+                                            DoWhileItem doWhile = new DoWhileItem(dialect, loopItem.getSrc(), loopItem.getLineStartItem(), loopItem.loop, loopItem.commands, expression);
+                                            currentList.set(currentList.size() - 1, doWhile);
+                                        }
+                                    }
+                                }
+                                
+                                
                             } else if (lastCommand instanceof Block) {
                                 Block blk = (Block) lastCommand;
                                 List<List<GraphTargetItem>> newTodos = new ArrayList<>(blk.getSubs());
@@ -1316,7 +1351,7 @@ public class Graph {
                                 todos.addAll(newTodos);
                             }
                         }
-                    }
+                    }                    
                     if (li instanceof ForItem) {
                         ForItem fi = (ForItem) li;
                         List<ContinueItem> continues = fi.getContinues();
@@ -1398,11 +1433,10 @@ public class Graph {
      * @return Second pass data or null
      */
     protected SecondPassData prepareSecondPass(BaseLocalData localData, List<GraphTargetItem> list) {
-        if (localData.allSwitchParts.isEmpty() && !localData.gotosUsed.getVal()) {
+        if (!localData.gotosUsed.getVal()) {
             return null;
         }
         SecondPassData spd = new SecondPassData();
-        spd.allSwitchParts.addAll(localData.allSwitchParts);
         return spd;
     }
 
@@ -1704,7 +1738,7 @@ public class Graph {
                         }
                     }
                 }
-                if (el.loopContinue.leadsTo(localData, this, code, r, loops, throwStates)) {
+                if (el.loopContinue.leadsTo(localData, this, code, r, loops, throwStates, false)) {
                     el.backEdges.add(r);
                 }
             }
@@ -1823,7 +1857,7 @@ public class Graph {
     /**
      * Final process. Override this method to provide custom behavior.
      *
-     * @param parent Paren item
+     * @param parent Parent item
      * @param list List of GraphTargetItems
      * @param level Level
      * @param localData Local data
@@ -2083,6 +2117,10 @@ public class Graph {
             if (ret.get(ret.size() - 1) instanceof Block) {
                 Block blk = (Block) ret.get(ret.size() - 1);
                 if (blk instanceof SwitchItem) {
+                    return;
+                }
+                
+                if (blk instanceof LoopItem) {
                     return;
                 }
 
@@ -2675,7 +2713,7 @@ public class Graph {
                         }
 
                         try {
-                            if (!part.leadsTo(localData, this, code, lastP1.loopContinue, loops2, throwStates)) {
+                            if (!part.leadsTo(localData, this, code, lastP1.loopContinue, loops2, throwStates, false)) {
                                 if (lastP1.breakCandidatesLocked == 0) {
                                     if (debugGetLoops) {
                                         System.err.println("added breakCandidate " + part + " to " + lastP1);
@@ -2708,7 +2746,7 @@ public class Graph {
                 }
                 part.level = level;
 
-                isLoop = part.leadsTo(localData, this, code, part, loops, throwStates);
+                isLoop = part.leadsTo(localData, this, code, part, loops, throwStates, false);
                 currentLoop = null;
                 if (isLoop) {
                     currentLoop = new Loop(loops.size(), part, null);
@@ -2868,7 +2906,7 @@ public class Graph {
                     for (int c = 0; c < currentLoop.breakCandidates.size(); c++) {
                         GraphPart cand = currentLoop.breakCandidates.get(c);
                         GraphPart sp = currentLoop.stopParts.get(currentLoop.stopParts.size() - 1);
-                        if (cand == sp || cand.leadsTo(localData, this, code, sp, new ArrayList<>() /*ignore existing loop states*/, throwStates)) {
+                        if (cand == sp || cand.leadsTo(localData, this, code, sp, new ArrayList<>() /*ignore existing loop states*/, throwStates, false)) {
                             breakCandidatesLeft.add(c);
                         }
                     }
@@ -2894,7 +2932,7 @@ public class Graph {
                             if (cand == cand2) {
                                 continue;
                             }
-                            if (cand.leadsTo(localData, this, code, cand2, loops, throwStates)) {
+                            if (cand.leadsTo(localData, this, code, cand2, loops, throwStates, false)) {
 
                                 int curLevl = currentLoop.breakCandidatesLevels.get(c1);
                                 int curLev2 = currentLoop.breakCandidatesLevels.get(c2);
@@ -2959,30 +2997,12 @@ public class Graph {
                 Map<GraphPart, Integer> count = new HashMap<>();
                 GraphPart winner = null;
                 int winnerCount = 0;
-                int winnerNumBlock = Integer.MAX_VALUE;
-
-                Set<GraphPart> bannedCandidates = new HashSet<>();
-                if (localData.secondPassData != null) {
-                    bannedCandidates = localData.secondPassData.allSwitchParts;
-                }
-
-                if (debugPrintLoopList) {
-                    System.err.println("bannedCandidates:");
-                    for (GraphPart p : bannedCandidates) {
-                        System.err.println("- " + p);
-                    }
-                }
+                int winnerNumBlock = Integer.MAX_VALUE;               
 
                 for (GraphPart cand : currentLoop.breakCandidates) {
                     if (removedX.contains(cand)) {
                         if (debugPrintLoopList) {
                             System.err.println("cand " + cand + " is removed");
-                        }
-                        continue;
-                    }
-                    if (bannedCandidates.contains(cand)) {
-                        if (debugPrintLoopList) {
-                            System.err.println("cand " + cand + " is banned");
                         }
                         continue;
                     }
@@ -3312,7 +3332,7 @@ public class Graph {
             }
             if (debugPrintGraph) {
                 System.err.println("loopsize:" + loops.size());
-            }
+            }                                    
             for (int l = loops.size() - 1; l >= 0; l--) {
                 Loop el = loops.get(l);
                 if (el == ignoredLoop) {
@@ -3338,7 +3358,7 @@ public class Graph {
                     }
                     continue;
                 }
-                if (el.loopBreak == part) {
+                if (el.loopBreak == part) {                                                                                            
                     if (currentLoop != null) {
                         currentLoop.phase = 0;
                     }
@@ -3354,8 +3374,8 @@ public class Graph {
                     ret.add(br);
 
                     return originalRet;
-                }
-                if (el.loopPreContinue == part) {
+                }                                
+                if (el.loopPreContinue == part) {                                        
                     if (currentLoop != null) {
                         currentLoop.phase = 0;
                     }
@@ -3382,7 +3402,7 @@ public class Graph {
             if (debugPrintGraph) {
                 System.err.println("stopParts: " + pathToString(stopPart));
             }
-
+                       
             if (stopPart.contains(part)) {
 
                 boolean isRealStopPart = false;
@@ -3433,7 +3453,7 @@ public class Graph {
                 }
                 return originalRet;
             }
-
+            
             boolean vCanHandleVisited = canHandleVisited(localData, part);
 
             if (vCanHandleVisited) {
@@ -3830,7 +3850,11 @@ public class Graph {
                         if (localData.secondPassData != null) {
                             if (next != null) {
                                 Set<GraphPart> ig = new HashSet<>();
+                                Set<GraphPartEdge> backEdges = new HashSet<>();
                                 for (Loop el : loops) {
+                                    for (GraphPart be : el.backEdges) {
+                                        backEdges.add(new GraphPartEdge(be, el.loopContinue));
+                                    }
                                     if (el.phase == 1) {
                                         if (el.loopContinue != null) {
                                             ig.add(el.loopContinue);
@@ -3848,7 +3872,20 @@ public class Graph {
                                 while (!s.isEmpty()) {
                                     GraphPart p = s.poll();
                                     v.add(p);
-                                    for (GraphPart r : p.refs) {
+                                    if (p == part) {
+                                        continue;
+                                    }
+                                    for (GraphPart r : p.refs) {                     
+                                        // #2636                                                                                
+                                        GraphPartEdge edge = new GraphPartEdge(r, p);                                        
+                                        if (backEdges.contains(edge)) {
+                                            continue;
+                                        }
+                                        // also #2636
+                                        if (!part.leadsTo(localData, this, code, r, loops, throwStates, true /*IMPORTANT*/)) {
+                                            continue;
+                                        }
+                                        
                                         if (r == part) {
                                             continue;
                                         }
@@ -3864,11 +3901,12 @@ public class Graph {
                                             if (v.contains(n)) {
                                                 continue;
                                             }
-                                            if (!n.leadsTo(localData, this, code, next, loops, throwStates)) {
+                                            if (!n.leadsTo(localData, this, code, next, loops, throwStates, true /*IMPORTANT*/)) {
                                                 GraphPart n2 = getCommonPart(localData, r, Arrays.asList(next, n), loops, throwStates);
                                                 if (n2 != null) {
-                                                    //System.err.println("Found block: start = " + part + ", break = " + n2+", exit = " + r);
+                                                    //System.err.println("Found block: start = " + part + ", break = " + n2 + ", exit = " + r);
                                                     //System.err.println("next = " + next);
+                                                    //System.err.println("n = " + n + " does not lead to next");
 
                                                     Loop el = new Loop(loops.size(), part, n2);
                                                     el.phase = 1;
@@ -4177,7 +4215,11 @@ public class Graph {
                     if (bi.loopId == currentLoop.id) {
                         bodyBranch = ifi.onTrue;
                     }
-                } else if (loopItem.commands.size() == 2 && (loopItem.commands.get(1) instanceof BreakItem)) {
+                } else if (loopItem.commands.size() == 2 
+                        && (loopItem.commands.get(1) instanceof BreakItem)
+                        && ifi.onFalse.isEmpty() 
+                        && !ifi.onTrue.isEmpty()   
+                ) {
                     BreakItem bi = (BreakItem) loopItem.commands.get(1);
                     if (ifi.onTrue.isEmpty()) {
                         inverted = true;
@@ -4186,8 +4228,16 @@ public class Graph {
                     breakpos2 = true;
                     if (bi.loopId != currentLoop.id) { //it's break of another parent loop
                         addBreakItem = bi; //we must add it after the loop
+                    } else {
+                        if (
+                                !(bodyBranch.get(bodyBranch.size() - 1) instanceof ContinueItem)
+                                && !(bodyBranch.get(bodyBranch.size() - 1) instanceof BreakItem)
+                                && !(bodyBranch.get(bodyBranch.size() - 1) instanceof ExitItem)
+                            ) {
+                            bodyBranch.add(loopItem.commands.get(1));
+                        }
                     }
-                } else if ((ifi.onTrue.size() == 1)
+                } /*else if ((ifi.onTrue.size() == 1)
                         && (ifi.onTrue.get(0) instanceof ContinueItem)
                         && (((ContinueItem) ifi.onTrue.get(0)).loopId != currentLoop.id)) {
                     addContinueItem = (ContinueItem) ifi.onTrue.get(0);
@@ -4207,8 +4257,8 @@ public class Graph {
                     }
                     bodyBranch = inverted ? ifi.onFalse : ifi.onTrue;
                     breakpos2 = true;
-                }
-                if (bodyBranch != null) {
+                }*/
+                if (bodyBranch != null) { //FIXME
                     int index = ret.indexOf(loopItem);
                     ret.remove(index);
                     List<GraphTargetItem> exprList = new ArrayList<>();
@@ -4784,7 +4834,7 @@ public class Graph {
              */
             //must go backwards to hit case 2, not case 1
             for (int i = caseBodyParts.size() - 1; i >= 0; i--) {
-                if (caseBodyParts.get(i).leadsTo(localData, this, code, defaultPart, loops, throwStates)) {
+                if (caseBodyParts.get(i).leadsTo(localData, this, code, defaultPart, loops, throwStates, false)) {
                     DefaultItem di = new DefaultItem(dialect);
                     caseValuesMap.add(i + 1, di);
                     caseBodyParts.add(i + 1, defaultPart);
@@ -4805,7 +4855,7 @@ public class Graph {
                         trace("2");                    
              */
             for (int i = 0; i < caseBodyParts.size(); i++) {
-                if (defaultPart.leadsTo(localData, this, code, caseBodyParts.get(i), loops, throwStates)) {
+                if (defaultPart.leadsTo(localData, this, code, caseBodyParts.get(i), loops, throwStates, false)) {
                     DefaultItem di = new DefaultItem(dialect);
                     caseValuesMap.add(i, di);
                     caseBodyParts.add(i, defaultPart);
@@ -4855,8 +4905,8 @@ public class Graph {
             GraphPart b = caseBodies.get(i);
             for (int j = i + 1; j < caseBodies.size(); j++) {
                 GraphPart b2 = caseBodies.get(j);
-                if (b2.leadsTo(localData, this, code, b, loops, throwStates)) {
-                    if (b.leadsTo(localData, this, code, b2, loops, throwStates)) { //unstructured code
+                if (b2.leadsTo(localData, this, code, b, loops, throwStates, false)) {
+                    if (b.leadsTo(localData, this, code, b2, loops, throwStates, false)) { //unstructured code
                         continue;
                     }
                     caseBodies.remove(j);
@@ -4864,7 +4914,7 @@ public class Graph {
                     i--;
                     continue loopi;
                 } else if (j > i + 1) {
-                    if (b.leadsTo(localData, this, code, b2, loops, throwStates)) {
+                    if (b.leadsTo(localData, this, code, b2, loops, throwStates, false)) {
                         caseBodies.remove(j);
                         caseBodies.add(i + 1, b2);
                         continue loopi;
@@ -4882,12 +4932,10 @@ public class Graph {
             List<GraphTargetItem> currentCaseCommands = new ArrayList<>();
             boolean willHaveBreak = false;
             if (i < caseBodies.size() - 1) {
-                if (!caseBodies.get(i).leadsTo(localData, this, code, caseBodies.get(i + 1), loops, throwStates)) {
+                if (!caseBodies.get(i).leadsTo(localData, this, code, caseBodies.get(i + 1), loops, throwStates, false)) {
                     willHaveBreak = true;
                 }
             }
-
-            localData.allSwitchParts.add(caseBodies.get(i));
 
             List<GraphPart> stopPart2x = new ArrayList<>(stopPart);
             List<StopPartKind> stopPartKind2x = new ArrayList<>(stopPartKind);

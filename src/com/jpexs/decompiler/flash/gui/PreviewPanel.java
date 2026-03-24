@@ -1826,7 +1826,8 @@ public class PreviewPanel extends JPersistentSplitPane implements TagEditorPanel
     }
 
     public static String formatMetadata(String input, int indent) {
-        input = input.replace("> <", "><");
+        input = input.replaceAll("\r?\n", "");
+        input = input.replaceAll("> +<", "><");
         try {
             Source xmlInput = new StreamSource(new StringReader(input));
             StringWriter stringWriter = new StringWriter();
@@ -2144,7 +2145,7 @@ public class PreviewPanel extends JPersistentSplitPane implements TagEditorPanel
 
                 SWFHeader header;
                 try (OutputStream fos = new BufferedOutputStream(new FileOutputStream(extTempFile))) {
-                    header = new PreviewExporter().exportSwf(fos, treeItem, backgroundColor, fontPageNum, true);
+                    header = new PreviewExporter().exportSwf(fos, treeItem, backgroundColor, fontPageNum, true, PreviewExporter.MORPH_SHAPE_DEFAULT_DURATION);
                 }
             }
             Main.runAsync(extTempFile);
@@ -2182,7 +2183,7 @@ public class PreviewPanel extends JPersistentSplitPane implements TagEditorPanel
 
             SWFHeader header;
             try (OutputStream fos = new BufferedOutputStream(new FileOutputStream(tempFile))) {
-                header = new PreviewExporter().exportSwf(fos, treeItem, backgroundColor, fontPageNum, false);
+                header = new PreviewExporter().exportSwf(fos, treeItem, backgroundColor, fontPageNum, false, PreviewExporter.MORPH_SHAPE_DEFAULT_DURATION);
             }
 
             this.currentItem = treeItem;

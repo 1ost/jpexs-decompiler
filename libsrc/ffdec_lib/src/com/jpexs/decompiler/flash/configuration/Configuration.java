@@ -1185,6 +1185,30 @@ public final class Configuration {
     @ConfigurationCategory("ui")
     public static ConfigurationItem<Boolean> allowDragAndDropFromResourcesTree = null;
     
+    @ConfigurationDefaultDouble(2.0)
+    @ConfigurationCategory("export")
+    public static ConfigurationItem<Double> lastExportMorphDuration = null;
+    
+    @ConfigurationDefaultInt(10)
+    @ConfigurationCategory("export")
+    public static ConfigurationItem<Integer> lastExportMorphNumberOfFrames = null;
+    
+    @ConfigurationDefaultBoolean(true)
+    @ConfigurationCategory("ui")
+    public static ConfigurationItem<Boolean> showDebugListenInfo = null;
+    
+    @ConfigurationDefaultBoolean(false)
+    @ConfigurationCategory("script")
+    public static ConfigurationItem<Boolean> as3QNameObfuscatedPropsInSquareBrackets = null;
+    
+    @ConfigurationDefaultBoolean(false)
+    @ConfigurationCategory("ui")
+    public static ConfigurationItem<Boolean> sortDebugVariablesAlphabetically = null;
+    
+    @ConfigurationDefaultBoolean(true)
+    @ConfigurationCategory("export")
+    public static ConfigurationItem<Boolean> svgExportGaussianBlur = null;
+    
     private static Map<String, String> configurationDescriptions = new LinkedHashMap<>();
     private static Map<String, String> configurationTitles = new LinkedHashMap<>();
 
